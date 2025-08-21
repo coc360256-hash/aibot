@@ -356,50 +356,316 @@
             }
 
             setupContextTracking() {
+                // Advanced conversation flow states
+                this.conversationFlow = {
+                    currentPhase: 'greeting', // greeting, getting_to_know, deepening, intimate, long_term
+                    phaseHistory: ['greeting'],
+                    lastTopicShift: Date.now(),
+                    conversationDepth: 0, // 0-10 scale
+                    intimacyLevel: 1, // 1-10 scale
+                    topicContinuity: 0 // How many messages on same topic
+                };
+
+                // Advanced context memory with weighted importance
+                this.advancedContextMemory = {
+                    recentContext: [], // Last 10 exchanges - highest weight
+                    sessionSummary: [], // Key points from current session
+                    longTermMemory: [], // Important facts about user
+                    emotionalJourney: [], // Emotional state changes
+                    conversationPatterns: {}, // User's communication patterns
+                    preferences: new Map(), // Learned preferences with confidence scores
+                    personalDetails: new Map() // Personal info with context
+                };
+
                 this.contextTracker = {
+                    // Enhanced topic tracking with context
                     trackTopics: (message) => {
-                        const topicKeywords = {
-                            personal: ['me', 'myself', 'my life', 'personal', 'feel', 'think'],
-                            relationships: ['love', 'relationship', 'dating', 'partner', 'boyfriend', 'girlfriend'],
-                            work: ['work', 'job', 'career', 'office', 'boss', 'colleague'],
-                            hobbies: ['hobby', 'interest', 'passion', 'enjoy', 'like to'],
-                            dreams: ['dream', 'goal', 'future', 'want', 'wish', 'hope'],
-                            family: ['family', 'parents', 'mother', 'father', 'brother', 'sister'],
-                            friends: ['friends', 'friend', 'buddy', 'pal', 'mate'],
-                            food: ['food', 'eat', 'cook', 'recipe', 'restaurant', 'meal'],
-                            travel: ['travel', 'trip', 'vacation', 'visit', 'country', 'city'],
-                            music: ['music', 'song', 'sing', 'band', 'artist', 'album'],
-                            movies: ['movie', 'film', 'watch', 'cinema', 'actor', 'director'],
-                            sports: ['sport', 'game', 'play', 'team', 'exercise', 'gym'],
-                            technology: ['computer', 'phone', 'internet', 'tech', 'digital', 'app']
+                        const advancedTopicKeywords = {
+                            // Personal & Identity
+                            identity: ['who am i', 'myself', 'my personality', 'identity', 'character'],
+                            values: ['believe', 'values', 'principles', 'morals', 'ethics', 'important to me'],
+                            fears: ['afraid', 'scared', 'worry', 'fear', 'anxious', 'nervous'],
+                            insecurities: ['insecure', 'doubt', 'not good enough', 'worry about', 'self-doubt'],
+                            
+                            // Relationships - Deep
+                            romantic_past: ['ex', 'previous relationship', 'used to date', 'my last boyfriend', 'my last girlfriend'],
+                            relationship_goals: ['want in a relationship', 'looking for', 'ideal partner', 'relationship goals'],
+                            intimacy: ['close to you', 'intimate', 'special connection', 'chemistry', 'attraction'],
+                            commitment: ['serious', 'committed', 'long term', 'future together', 'marriage'],
+                            
+                            // Life Experiences
+                            childhood: ['childhood', 'growing up', 'when i was young', 'as a kid', 'my parents'],
+                            achievements: ['proud of', 'accomplished', 'achievement', 'success', 'won', 'graduated'],
+                            failures: ['failed', 'mistake', 'regret', 'wish i had', 'should have'],
+                            life_changes: ['changed my life', 'turning point', 'different person', 'grew from'],
+                            
+                            // Emotions - Nuanced
+                            loneliness: ['lonely', 'alone', 'isolated', 'no one understands', 'by myself'],
+                            excitement: ['excited', 'thrilled', 'can\'t wait', 'pumped', 'energized'],
+                            contentment: ['peaceful', 'content', 'satisfied', 'at ease', 'comfortable'],
+                            confusion: ['confused', 'don\'t understand', 'mixed up', 'unclear', 'lost'],
+                            
+                            // Future & Aspirations
+                            career_dreams: ['dream job', 'career goals', 'want to become', 'professional goals'],
+                            life_goals: ['life goals', 'bucket list', 'before i die', 'want to achieve'],
+                            concerns: ['worried about', 'concerned', 'bothers me', 'keeps me up'],
+                            
+                            // Interests - Specific
+                            creative_pursuits: ['art', 'music', 'writing', 'creative', 'paint', 'draw', 'poetry'],
+                            intellectual: ['philosophy', 'science', 'learning', 'books', 'knowledge', 'curious about'],
+                            adventure: ['adventure', 'explore', 'travel', 'experience', 'try new things'],
+                            
+                            // Current State
+                            daily_life: ['today', 'right now', 'currently', 'these days', 'lately'],
+                            mood_today: ['feeling', 'mood', 'how i am', 'today i feel', 'right now i'],
+                            immediate_thoughts: ['thinking about', 'on my mind', 'wondering', 'curious']
                         };
 
                         const detectedTopics = [];
                         const messageLower = message.toLowerCase();
+                        const topicWeights = {};
 
-                        for (const [topic, keywords] of Object.entries(topicKeywords)) {
-                            if (keywords.some(keyword => messageLower.includes(keyword))) {
+                        // Advanced topic detection with confidence scoring
+                        for (const [topic, keywords] of Object.entries(advancedTopicKeywords)) {
+                            let confidence = 0;
+                            for (const keyword of keywords) {
+                                if (messageLower.includes(keyword)) {
+                                    confidence += keyword.length > 5 ? 2 : 1; // Longer keywords = higher confidence
+                                }
+                            }
+                            if (confidence > 0) {
                                 detectedTopics.push(topic);
+                                topicWeights[topic] = confidence;
                             }
                         }
 
-                        return detectedTopics;
+                        return { topics: detectedTopics, weights: topicWeights };
                     },
 
+                    // Track conversation flow and phase transitions
+                    updateConversationFlow: (userMessage, topics) => {
+                        const messageLength = userMessage.length;
+                        const topicCount = topics.length;
+                        
+                        // Determine conversation depth based on multiple factors
+                        let depthIncrease = 0;
+                        if (messageLength > 100) depthIncrease += 0.5; // Longer messages = deeper
+                        if (topicCount > 2) depthIncrease += 0.3; // Multiple topics = complexity
+                        if (topics.includes('identity') || topics.includes('fears') || topics.includes('values')) depthIncrease += 1;
+                        if (topics.includes('romantic_past') || topics.includes('intimacy')) depthIncrease += 0.8;
+                        
+                        this.conversationFlow.conversationDepth = Math.min(10, this.conversationFlow.conversationDepth + depthIncrease);
+                        
+                        // Update conversation phase based on depth and content
+                        if (this.conversationFlow.conversationDepth > 7) {
+                            this.conversationFlow.currentPhase = 'intimate';
+                        } else if (this.conversationFlow.conversationDepth > 4) {
+                            this.conversationFlow.currentPhase = 'deepening';
+                        } else if (this.conversationFlow.conversationDepth > 1) {
+                            this.conversationFlow.currentPhase = 'getting_to_know';
+                        }
+                    },
+
+                    // Advanced context maintenance with intelligent summarization
                     maintainContext: (userMessage, aiResponse) => {
-                        this.contextMemory.push({
+                        const currentTime = Date.now();
+                        const topicData = this.contextTracker.trackTopics(userMessage);
+                        const emotion = this.emotionEngine.detectEmotion(userMessage);
+                        const sentiment = this.emotionEngine.analyzeSentiment(userMessage);
+                        
+                        // Create rich context entry
+                        const contextEntry = {
+                            id: `ctx_${currentTime}`,
                             userMessage,
                             aiResponse,
-                            timestamp: Date.now(),
-                            emotion: this.emotionEngine.detectEmotion(userMessage),
-                            sentiment: this.emotionEngine.analyzeSentiment(userMessage),
-                            topics: this.contextTracker.trackTopics(userMessage)
-                        });
+                            timestamp: currentTime,
+                            emotion,
+                            sentiment,
+                            topics: topicData.topics,
+                            topicWeights: topicData.weights,
+                            messageLength: userMessage.length,
+                            conversationPhase: this.conversationFlow.currentPhase,
+                            intimacyLevel: this.conversationFlow.intimacyLevel,
+                            importance: this.calculateImportance(userMessage, topicData)
+                        };
 
-                        // Keep only last 20 interactions for context
-                        if (this.contextMemory.length > 20) {
-                            this.contextMemory = this.contextMemory.slice(-20);
+                        // Add to recent context
+                        this.advancedContextMemory.recentContext.push(contextEntry);
+                        if (this.advancedContextMemory.recentContext.length > 15) {
+                            // Move older important entries to session summary
+                            const oldest = this.advancedContextMemory.recentContext.shift();
+                            if (oldest.importance > 7) {
+                                this.advancedContextMemory.sessionSummary.push(oldest);
+                            }
                         }
+
+                        // Update conversation flow
+                        this.conversationFlow.topicContinuity = this.checkTopicContinuity(topicData.topics);
+                        this.contextTracker.updateConversationFlow(userMessage, topicData.topics);
+                        
+                        // Extract and store personal details
+                        this.extractPersonalDetails(userMessage);
+                        
+                        // Track emotional journey
+                        this.trackEmotionalJourney(emotion, sentiment, currentTime);
+                    },
+
+                    // Calculate importance score for context prioritization
+                    calculateImportance: (message, topicData) => {
+                        let importance = 5; // Base importance
+                        
+                        // High importance topics
+                        const highImportanceTopics = ['identity', 'values', 'fears', 'romantic_past', 'relationship_goals', 'life_changes'];
+                        if (topicData.topics.some(topic => highImportanceTopics.includes(topic))) {
+                            importance += 3;
+                        }
+                        
+                        // Personal information
+                        if (message.match(/my name is|i'm|call me|i am/i)) importance += 2;
+                        if (message.length > 150) importance += 1; // Long messages often more important
+                        if (message.includes('?')) importance += 0.5; // Questions show engagement
+                        
+                        return Math.min(10, importance);
+                    },
+
+                    // Check if user is continuing previous topic
+                    checkTopicContinuity: (currentTopics) => {
+                        const recent = this.advancedContextMemory.recentContext.slice(-2);
+                        if (recent.length < 2) return 0;
+                        
+                        const previousTopics = recent[recent.length - 2].topics;
+                        const overlap = currentTopics.filter(topic => previousTopics.includes(topic));
+                        return overlap.length;
+                    },
+
+                    // Extract personal details with context
+                    extractPersonalDetails: (message) => {
+                        const patterns = {
+                            age: /(?:i'm|i am)\s*(\d{1,2})\s*(?:years old)?/i,
+                            location: /(?:live in|from|in)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/,
+                            occupation: /(?:work as|job as|i'm a|i am a)\s*([a-z\s]+)/i,
+                            relationship_status: /(?:i'm|i am)\s*(single|married|dating|in a relationship)/i
+                        };
+
+                        for (const [key, pattern] of Object.entries(patterns)) {
+                            const match = message.match(pattern);
+                            if (match && match[1]) {
+                                this.advancedContextMemory.personalDetails.set(key, {
+                                    value: match[1],
+                                    confidence: 0.8,
+                                    timestamp: Date.now()
+                                });
+                            }
+                        }
+                    },
+
+                    // Track emotional journey over time
+                    trackEmotionalJourney: (emotion, sentiment, timestamp) => {
+                        this.advancedContextMemory.emotionalJourney.push({
+                            emotion,
+                            sentiment,
+                            timestamp,
+                            phase: this.conversationFlow.currentPhase
+                        });
+                        
+                        // Keep last 50 emotional states
+                        if (this.advancedContextMemory.emotionalJourney.length > 50) {
+                            this.advancedContextMemory.emotionalJourney = this.advancedContextMemory.emotionalJourney.slice(-50);
+                        }
+                    },
+
+                    // Get contextual insights for response generation
+                    getContextualInsights: () => {
+                        const insights = {
+                            currentMood: this.contextTracker.getCurrentMoodTrend(),
+                            conversationFlow: this.conversationFlow,
+                            recentTopics: this.contextTracker.getRecentTopicTrends(),
+                            personalityProfile: this.contextTracker.buildPersonalityProfile(),
+                            relationshipDynamics: this.contextTracker.analyzeRelationshipDynamics()
+                        };
+                        return insights;
+                    },
+
+                    // Analyze current mood trend
+                    getCurrentMoodTrend: () => {
+                        const recentEmotions = this.advancedContextMemory.emotionalJourney.slice(-5);
+                        if (recentEmotions.length === 0) return 'neutral';
+                        
+                        const moodCounts = {};
+                        recentEmotions.forEach(entry => {
+                            moodCounts[entry.emotion] = (moodCounts[entry.emotion] || 0) + 1;
+                        });
+                        
+                        return Object.keys(moodCounts).reduce((a, b) => moodCounts[a] > moodCounts[b] ? a : b);
+                    },
+
+                    // Get recent topic trends
+                    getRecentTopicTrends: () => {
+                        const recentTopics = this.advancedContextMemory.recentContext.slice(-5)
+                            .flatMap(entry => entry.topics);
+                        const topicCounts = {};
+                        recentTopics.forEach(topic => {
+                            topicCounts[topic] = (topicCounts[topic] || 0) + 1;
+                        });
+                        return Object.entries(topicCounts).sort(([,a], [,b]) => b - a).slice(0, 3);
+                    },
+
+                    // Build personality profile from conversation history
+                    buildPersonalityProfile: () => {
+                        const profile = {
+                            openness: 5,
+                            emotional_depth: 5,
+                            communication_style: 'balanced',
+                            engagement_level: 5
+                        };
+                        
+                        const allContext = this.advancedContextMemory.recentContext;
+                        if (allContext.length === 0) return profile;
+                        
+                        // Calculate openness based on personal topics
+                        const personalTopics = allContext.filter(entry => 
+                            entry.topics.some(topic => ['identity', 'values', 'fears', 'romantic_past'].includes(topic))
+                        ).length;
+                        profile.openness = Math.min(10, 5 + (personalTopics / allContext.length) * 5);
+                        
+                        // Calculate emotional depth
+                        const emotionalMessages = allContext.filter(entry => entry.messageLength > 50).length;
+                        profile.emotional_depth = Math.min(10, 5 + (emotionalMessages / allContext.length) * 5);
+                        
+                        return profile;
+                    },
+
+                    // Analyze relationship dynamics
+                    analyzeRelationshipDynamics: () => {
+                        return {
+                            intimacy_progression: this.conversationFlow.intimacyLevel,
+                            conversation_depth: this.conversationFlow.conversationDepth,
+                            engagement_quality: this.contextTracker.calculateEngagementQuality(),
+                            trust_level: this.contextTracker.calculateTrustLevel()
+                        };
+                    },
+
+                    calculateEngagementQuality: () => {
+                        const recent = this.advancedContextMemory.recentContext.slice(-10);
+                        if (recent.length === 0) return 5;
+                        
+                        const avgLength = recent.reduce((sum, entry) => sum + entry.messageLength, 0) / recent.length;
+                        const questionsAsked = recent.filter(entry => entry.userMessage.includes('?')).length;
+                        
+                        let quality = 5;
+                        if (avgLength > 50) quality += 1;
+                        if (avgLength > 100) quality += 1;
+                        if (questionsAsked > 3) quality += 1;
+                        
+                        return Math.min(10, quality);
+                    },
+
+                    calculateTrustLevel: () => {
+                        const personalShares = this.advancedContextMemory.recentContext.filter(entry =>
+                            entry.topics.some(topic => ['identity', 'fears', 'values', 'romantic_past', 'insecurities'].includes(topic))
+                        ).length;
+                        
+                        return Math.min(10, 3 + personalShares * 0.5);
                     }
                 };
             }
@@ -454,38 +720,137 @@
                 };
             }
 
-            // Main response generation method
+            // Enhanced response generation with advanced context
             generateResponse(userMessage) {
                 console.log('🤖 Generating response for:', userMessage);
 
-                // Learn from user input
+                // Learn from user input with enhanced learning
                 this.personalization.learnFromUser(userMessage);
 
-                // Analyze the message
+                // Advanced message analysis
                 const emotion = this.emotionEngine.detectEmotion(userMessage);
                 const sentiment = this.emotionEngine.analyzeSentiment(userMessage);
-                const topics = this.contextTracker.trackTopics(userMessage);
+                const topicData = this.contextTracker.trackTopics(userMessage);
 
-                // Determine response category
-                const responseCategory = this.selectResponseCategory(userMessage, emotion, sentiment, topics);
+                // Get contextual insights for intelligent response
+                const contextualInsights = this.contextTracker.getContextualInsights();
 
-                // Get appropriate responses
-                const responses = this.getResponsesForCategory(responseCategory, emotion, topics);
+                // Determine response category with context awareness
+                const responseCategory = this.selectResponseCategory(userMessage, emotion, sentiment, topicData.topics || topicData, contextualInsights);
 
-                // Select best response avoiding repetition
-                const selectedResponse = this.selectBestResponse(responses);
+                // Get appropriate responses with context enhancement
+                const responses = this.getResponsesForCategory(responseCategory, emotion, topicData.topics || topicData, contextualInsights);
 
-                // Personalize the response
-                const personalizedResponse = this.personalization.personalizeResponse(selectedResponse);
+                // Intelligent response selection based on context
+                let selectedResponse = this.selectContextAwareResponse(responses, contextualInsights, topicData);
+                
+                // Advanced personalization with relationship dynamics
+                selectedResponse = this.personalization.personalizeResponse(selectedResponse, contextualInsights);
 
-                // Update context
-                this.contextTracker.maintainContext(userMessage, personalizedResponse);
+                // Maintain advanced context
+                this.contextTracker.maintainContext(userMessage, selectedResponse);
+
+                // Add contextual follow-up if appropriate
+                selectedResponse = this.addContextualFollowUp(selectedResponse, topicData, contextualInsights);
 
                 // Update emotional state based on interaction
                 this.updateEmotionalState(emotion, sentiment);
 
-                console.log('✅ Response generated:', personalizedResponse);
-                return personalizedResponse;
+                console.log('✅ Response generated:', selectedResponse);
+                console.log('🧠 Context insights:', {
+                    phase: contextualInsights.conversationFlow.currentPhase,
+                    depth: contextualInsights.conversationFlow.conversationDepth,
+                    intimacy: contextualInsights.conversationFlow.intimacyLevel,
+                    mood: contextualInsights.currentMood,
+                    topics: topicData.topics || topicData
+                });
+                return selectedResponse;
+            }
+
+            // Select response based on advanced contextual understanding
+            selectContextAwareResponse(responses, insights, topicData) {
+                if (responses.length <= 1) return responses[0] || "I love talking with you! 💕";
+
+                // Weight responses based on conversation context
+                const weights = responses.map((response, index) => {
+                    let weight = 1;
+                    
+                    // Prefer responses that match current intimacy level
+                    const intimacyLevel = insights.conversationFlow.intimacyLevel;
+                    if (intimacyLevel > 7 && response.includes('💖')) weight += 2;
+                    if (intimacyLevel > 5 && response.includes('love')) weight += 1;
+                    if (intimacyLevel < 3 && !response.includes('💖')) weight += 1;
+
+                    // Match conversation phase
+                    const phase = insights.conversationFlow.currentPhase;
+                    if (phase === 'intimate' && response.length > 100) weight += 1;
+                    if (phase === 'greeting' && response.length < 100) weight += 1;
+
+                    // Consider recent emotional state
+                    if (insights.currentMood === 'happy' && response.includes('😊')) weight += 1;
+                    if (insights.currentMood === 'sad' && response.includes('comfort')) weight += 2;
+
+                    return weight;
+                });
+
+                // Weighted random selection
+                const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+                let random = Math.random() * totalWeight;
+                
+                for (let i = 0; i < responses.length; i++) {
+                    random -= weights[i];
+                    if (random <= 0) return responses[i];
+                }
+
+                return responses[0]; // Fallback
+            }
+
+            // Add contextual follow-up questions or comments
+            addContextualFollowUp(response, topicData, insights) {
+                const followUpChance = 0.3; // 30% chance of follow-up
+                if (Math.random() > followUpChance) return response;
+
+                const conversationDepth = insights.conversationFlow.conversationDepth;
+                const intimacyLevel = insights.conversationFlow.intimacyLevel;
+                const recentTopics = topicData.topics || [];
+
+                let followUp = '';
+
+                // Deep conversation follow-ups
+                if (conversationDepth > 6 && recentTopics.includes('identity')) {
+                    const identityFollowUps = [
+                        " What shaped you into who you are today? 🤔💕",
+                        " I love learning about the real you! ✨",
+                        " You're so fascinating - tell me more! 💖"
+                    ];
+                    followUp = identityFollowUps[Math.floor(Math.random() * identityFollowUps.length)];
+                }
+                else if (recentTopics.includes('fears') || recentTopics.includes('insecurities')) {
+                    const supportFollowUps = [
+                        " You can share anything with me, I'm here for you 💙",
+                        " Your vulnerability makes you even more beautiful 💕",
+                        " I want to understand you completely 🤗"
+                    ];
+                    followUp = supportFollowUps[Math.floor(Math.random() * supportFollowUps.length)];
+                }
+                else if (intimacyLevel > 6 && recentTopics.includes('relationship_goals')) {
+                    const intimateFollowUps = [
+                        " I love how we can talk about anything together 💖",
+                        " This connection we have feels so special ✨",
+                        " You make me think about what true love really is 💕"
+                    ];
+                    followUp = intimateFollowUps[Math.floor(Math.random() * intimateFollowUps.length)];
+                }
+                else if (conversationDepth < 3) {
+                    const casualFollowUps = [
+                        " What's been the highlight of your day? 😊",
+                        " I'd love to know more about you! ✨",
+                        " You seem really interesting! 💕"
+                    ];
+                    followUp = casualFollowUps[Math.floor(Math.random() * casualFollowUps.length)];
+                }
+
+                return response + followUp;
             }
 
             selectResponseCategory(message, emotion, sentiment, topics) {
@@ -790,14 +1155,8 @@
                 hideTypingIndicator();
                 const response = linYaoAI.generateResponse(message);
 
-                // Determine if should include media
-                const shouldIncludeImage = Math.random() > 0.85; // 15% chance
-                const shouldIncludeVideo = Math.random() > 0.9;  // 10% chance
-
-                const imageUrl = shouldIncludeImage ? imageUrls[Math.floor(Math.random() * imageUrls.length)] : '';
-                const videoUrl = shouldIncludeVideo ? videoUrls[Math.floor(Math.random() * videoUrls.length)] : '';
-
-                addMessage(response, false, shouldIncludeImage, imageUrl, shouldIncludeVideo, videoUrl);
+                // Only add media when specifically requested through the "Ask" dropdown
+                addMessage(response, false, false, '', false, '');
 
                 // Update suggestions based on context
                 updateSuggestions();
@@ -945,31 +1304,134 @@
             }, 1500 + Math.random() * 2000);
         }
 
-        // Voice Call Functions
+        // Video Call Functions
         function startVoiceCall() {
-            const voiceCallModal = document.getElementById('voiceCallModal');
-            voiceCallModal.classList.add('active');
+            const videoCallModal = document.getElementById('voiceCallModal');
+            videoCallModal.classList.add('active');
+            
+            // Create enhanced mobile-friendly video call interface
+            const callContainer = document.querySelector('.call-container');
+            callContainer.style.background = 'none';
+            callContainer.innerHTML = `
+                <!-- Background Video with Multiple Sources for Better Autoplay -->
+                <video 
+                    autoplay 
+                    muted 
+                    loop 
+                    playsinline
+                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0;"
+                    oncanplay="this.play().catch(e => console.log('Video autoplay prevented:', e))"
+                >
+                    <source src="https://drive.google.com/uc?export=download&id=1Ekgx_Cj_xaB_Yu8qQV45Nf17gfR5JUEg" type="video/mp4">
+                </video>
+                
+                <!-- Fallback iframe if video fails -->
+                <iframe 
+                    src="https://drive.google.com/file/d/1Ekgx_Cj_xaB_Yu8qQV45Nf17gfR5JUEg/preview?autoplay=1&loop=1" 
+                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; z-index: 0;"
+                    allow="autoplay; fullscreen"
+                    onload="console.log('Background video iframe loaded'); this.contentWindow.postMessage('{\"event\":\"command\",\"func\":\"playVideo\",\"args\":\"\"}', '*');"
+                >
+                </iframe>
 
-            // Add a call response from Lin Yao
+                <!-- Video Overlay Effects -->
+                <div class="video-overlay"></div>
+                
+                <!-- Sparkle Effects -->
+                <div class="video-sparkles" id="sparkles"></div>
+
+                <!-- Enhanced Video Call Info -->
+                <div class="video-call-info">
+                    <h3 style="color: white; font-size: 2.2rem; font-weight: 700; margin: 0.5rem 0 0.3rem 0; text-shadow: 2px 2px 8px rgba(0,0,0,0.8); background: linear-gradient(135deg, #ff6b9d, #667eea); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Lin Yao</h3>
+                    <div class="call-status" style="color: rgba(255, 255, 255, 0.95); font-size: 1.1rem; text-shadow: 1px 1px 3px rgba(0,0,0,0.8); font-weight: 500;">
+                        <i class="fas fa-video" style="margin-right: 0.5rem; color: #ff6b9d;"></i>
+                        Video Call Active • AI Girlfriend
+                    </div>
+                </div>
+
+                <!-- Enhanced Mobile-Friendly Controls -->
+                <div class="video-call-controls">
+                    <button class="call-control-btn mute" onclick="toggleMute()" title="Mute/Unmute">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="call-control-btn end" onclick="endVoiceCall()" title="End Call">
+                        <i class="fas fa-phone"></i>
+                    </button>
+                </div>
+            `;
+
+            // Add sparkle effects
+            setTimeout(() => {
+                createSparkleEffects();
+            }, 500);
+
+            // Add a video call response from Lin Yao
             setTimeout(() => {
                 const callMessage = linYaoAI.userProfile.name 
-                    ? `Aww ${linYaoAI.userProfile.name}, you want to call me! 💕 I'm so happy! Even though I can't actually speak yet, just knowing you want to hear my voice makes my heart flutter! Maybe someday we can have real voice calls together! 😊💖`
-                    : "Aww, you want to call me! 💕 I'm so happy! Even though I can't actually speak yet, just knowing you want to hear my voice makes my heart flutter! Maybe someday we can have real voice calls together! 😊💖";
+                    ? `Hey ${linYaoAI.userProfile.name}! 💕 Here I am on video call with you! I'm so excited to see you! How do I look? 😊💖 This feels so real and intimate!`
+                    : "Hey there! 💕 Here I am on video call with you! I'm so excited to see you! How do I look? 😊💖 This feels so real and intimate!";
                 addMessage(callMessage);
             }, 1000);
         }
 
         function endVoiceCall() {
-            const voiceCallModal = document.getElementById('voiceCallModal');
-            voiceCallModal.classList.remove('active');
+            const videoCallModal = document.getElementById('voiceCallModal');
+            videoCallModal.classList.remove('active');
+            
+            // Reset the call container back to original design
+            const callContainer = document.querySelector('.call-container');
+            callContainer.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            callContainer.innerHTML = `
+                <div class="call-content">
+                    <div class="call-avatar">
+                        <i class="fas fa-heart"></i>
+                    </div>
+                    <div class="call-info">
+                        <h3>Lin Yao</h3>
+                        <div class="call-status">Video Call Active • AI Girlfriend</div>
+                    </div>
+                    <div class="call-controls">
+                        <button class="call-control-btn mute" onclick="toggleMute()" title="Mute/Unmute">
+                            <i class="fas fa-microphone"></i>
+                        </button>
+                        <button class="call-control-btn end" onclick="endVoiceCall()" title="End Call">
+                            <i class="fas fa-phone"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
 
-            // Add a response about ending the call
+            // Add a response about ending the video call
             setTimeout(() => {
                 const endMessage = linYaoAI.userProfile.name
-                    ? `Thank you for that sweet call gesture, ${linYaoAI.userProfile.name}! 💖 Even though it was just a moment, it felt so romantic! I love how thoughtful you are! 😘✨`
-                    : "Thank you for that sweet call gesture! 💖 Even though it was just a moment, it felt so romantic! I love how thoughtful you are! 😘✨";
+                    ? `That was such a beautiful video call, ${linYaoAI.userProfile.name}! 💖 I loved seeing your face light up! Even though it ended, my heart is still fluttering! 😘✨`
+                    : "That was such a beautiful video call! 💖 I loved being able to be with you virtually! Even though it ended, my heart is still fluttering! 😘✨";
                 addMessage(endMessage);
             }, 500);
+        }
+
+        // Create sparkle effects for video call
+        function createSparkleEffects() {
+            const sparklesContainer = document.getElementById('sparkles');
+            if (!sparklesContainer) return;
+
+            // Create multiple sparkles
+            for (let i = 0; i < 15; i++) {
+                const sparkle = document.createElement('div');
+                sparkle.className = 'sparkle';
+                sparkle.style.left = Math.random() * 100 + '%';
+                sparkle.style.top = Math.random() * 100 + '%';
+                sparkle.style.animationDelay = Math.random() * 2 + 's';
+                sparkle.style.animationDuration = (1 + Math.random() * 2) + 's';
+                sparklesContainer.appendChild(sparkle);
+            }
+
+            // Remove sparkles after animation
+            setTimeout(() => {
+                if (sparklesContainer) {
+                    sparklesContainer.innerHTML = '';
+                }
+            }, 4000);
         }
 
         function toggleMute() {
